@@ -1,0 +1,12 @@
+--- arch/x86/kvm/x86.c
++++ arch/x86/kvm/x86.c
+@@ -6866,6 +6900,9 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
+ 		return 1;
+ 
+ 	if (r == EMULATION_FAILED) {
++		if (vcpu->run->exit_reason == KVM_EXIT_SPP)
++			return 0;
++
+ 		if (reexecute_instruction(vcpu, cr2, write_fault_to_spt,
+ 					emulation_type))
+ 			return 1;
