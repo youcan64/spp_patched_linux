@@ -3596,6 +3596,9 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 	bool spp_protected = false;
 	u64 spte = 0ull;
 	uint retry_count = 0;
+	vcpu->run->exit_reason = KVM_EXIT_UNKNOWN;
+	pr_info("SPP: fast_page_fault\n");
+	pr_info("SPP: addr: %llu\n", cr2_or_gpa);
 
 	if (!VALID_PAGE(vcpu->arch.mmu->root_hpa))
 		return false;
@@ -3655,10 +3658,10 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 
 				fault_handled = true;
 				vcpu->run->exit_reason = KVM_EXIT_SPP;
-				vcpu->run->spp.addr = gva;
+				vcpu->run->spp.addr = cr2_or_gpa;
 				vcpu->run->spp.insn_len = len;
 				trace_kvm_spp_induced_page_fault(vcpu,
-								 gva,
+								 cr2_or_gpa,
 								 len);
 				break;
 			}

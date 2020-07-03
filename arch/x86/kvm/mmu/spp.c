@@ -431,6 +431,7 @@ int kvm_spp_set_permission(struct kvm *kvm, u64 gfn, u32 npages,
 	gfn_t gfn_end;
 	int i, count, level;
 	bool flush = false;
+	pr_info("SPP: set_permission\n");
 
 	if (!kvm->arch.spp_active)
 		return -ENODEV;
@@ -503,6 +504,9 @@ int kvm_spp_mark_protection(struct kvm *kvm, u64 gfn, u32 access)
 	struct kvm_rmap_head *rmap_head;
 	int ret = 0;
 	bool enable;
+	pr_info("SPP: mark_protection\n");
+	pr_info("SPP: gfn: %llu\n", gfn);
+	pr_info("SPP: access_map: %u\n", access);
 
 	if (!kvm->arch.spp_active)
 		return -ENODEV;
@@ -575,9 +579,13 @@ int kvm_vm_ioctl_get_subpages(struct kvm *kvm,
 {
 	int ret;
 
+	pr_info("SPP: get_subpage\n");
+	pr_info("SPP: gfn: %llu\n", gfn);
+	pr_info("SPP: access_map[0]: %u\n", access_map[0]);
 	mutex_lock(&kvm->slots_lock);
 	ret = kvm_spp_get_permission(kvm, gfn, npages, access_map);
 	mutex_unlock(&kvm->slots_lock);
+	pr_info("SPP: access_map[0]: %u\n", access_map[0]);
 
 	return ret;
 }

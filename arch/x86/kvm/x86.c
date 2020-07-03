@@ -5807,9 +5807,10 @@ static bool is_emulator_spp_protected(struct kvm_vcpu *vcpu,
 			access = gfn_to_subpage_wp_info(slot, gfn);
 			if (access && *access != FULL_SPP_ACCESS) {
 				vcpu->run->exit_reason = KVM_EXIT_SPP;
-				vcpu->run->spp.addr = gfn;
-				vcpu->run->spp.insn_len =
-					kvm_x86_ops->get_insn_len(vcpu);
+				vcpu->run->spp.addr = gpa;
+				// vcpu->run->spp.insn_len =
+				// 	kvm_x86_ops->get_insn_len(vcpu);
+				vcpu->run->spp.insn_len = 0xf;
 				return true;
 			}
 		}
@@ -6925,6 +6926,9 @@ restart:
 		return 1;
 
 	if (r == EMULATION_FAILED) {
+		if (vcpu->run->exit_reason == KVM_EXIT_SPP)
+			return 0;
+
 		if (reexecute_instruction(vcpu, cr2_or_gpa, write_fault_to_spt,
 					emulation_type))
 			return 1;

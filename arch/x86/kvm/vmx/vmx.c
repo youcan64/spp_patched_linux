@@ -5175,6 +5175,7 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	u64 error_code;
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
+	// pr_info("handle_ept_violation: %lu\n",exit_qualification);
 
 	/*
 	 * EPT violation happened while executing iret from NMI,
@@ -5406,6 +5407,7 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 	gfn_t gfn, gfn_end;
 	u32 *access;
 	gpa_t gpa;
+	pr_info("SPP: handle_spp");
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 
@@ -5983,6 +5985,7 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 			(exit_reason != EXIT_REASON_EXCEPTION_NMI &&
 			exit_reason != EXIT_REASON_EPT_VIOLATION &&
 			exit_reason != EXIT_REASON_PML_FULL &&
+			exit_reason != EXIT_REASON_SPP &&
 			exit_reason != EXIT_REASON_TASK_SWITCH)) {
 		vcpu->run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
 		vcpu->run->internal.suberror = KVM_INTERNAL_ERROR_DELIVERY_EV;
