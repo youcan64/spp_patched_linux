@@ -153,8 +153,41 @@ static u64 format_spp_spte(u32 spp_wp_bitmap)
 	 * SPPT L4E, the odd bits are reserved now, so convert 4-byte write
 	 * permission bitmap to 8-byte SPP L4E format.
 	 */
-	for (i = 0; i < 32; i++)
-		new_spte |= (spp_wp_bitmap & BIT_ULL(i)) << i;
+	// for (i = 0; i < 32; i++)
+		// new_spte |= (spp_wp_bitmap & BIT_ULL(i)) << i;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(0)) << 0;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(1)) << 1;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(2)) << 2;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(3)) << 3;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(4)) << 4;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(5)) << 5;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(6)) << 6;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(7)) << 7;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(8)) << 8;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(9)) << 9;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(10)) << 10;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(11)) << 11;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(12)) << 12;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(13)) << 13;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(14)) << 14;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(15)) << 15;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(16)) << 16;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(17)) << 17;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(18)) << 18;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(19)) << 19;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(20)) << 20;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(21)) << 21;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(22)) << 22;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(23)) << 23;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(24)) << 24;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(25)) << 25;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(26)) << 26;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(27)) << 27;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(28)) << 28;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(29)) << 29;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(30)) << 30;
+	new_spte |= (spp_wp_bitmap & BIT_ULL(31)) << 31;
+
 
 	return new_spte;
 }
@@ -354,6 +387,7 @@ int spp_init(struct kvm *kvm)
 		kvm_make_request(KVM_REQ_LOAD_CR3, vcpu);
 	}
 
+	kvm->spp_log_index = 0;
 	kvm->arch.spp_active = true;
 	return 0;
 }
@@ -431,7 +465,7 @@ int kvm_spp_set_permission(struct kvm *kvm, u64 gfn, u32 npages,
 	gfn_t gfn_end;
 	int i, count, level;
 	bool flush = false;
-	pr_info("SPP: set_permission\n");
+	// pr_info("SPP: set_permission\n");
 
 	if (!kvm->arch.spp_active)
 		return -ENODEV;
@@ -504,9 +538,9 @@ int kvm_spp_mark_protection(struct kvm *kvm, u64 gfn, u32 access)
 	struct kvm_rmap_head *rmap_head;
 	int ret = 0;
 	bool enable;
-	pr_info("SPP: mark_protection\n");
-	pr_info("SPP: gfn: %llu\n", gfn);
-	pr_info("SPP: access_map: %u\n", access);
+	// pr_info("SPP: mark_protection\n");
+	// pr_info("SPP: gfn: %llu\n", gfn);
+	// pr_info("SPP: access_map: %u\n", access);
 
 	if (!kvm->arch.spp_active)
 		return -ENODEV;
@@ -579,13 +613,13 @@ int kvm_vm_ioctl_get_subpages(struct kvm *kvm,
 {
 	int ret;
 
-	pr_info("SPP: get_subpage\n");
-	pr_info("SPP: gfn: %llu\n", gfn);
-	pr_info("SPP: access_map[0]: %u\n", access_map[0]);
+	// pr_info("SPP: get_subpage\n");
+	// pr_info("SPP: gfn: %llu\n", gfn);
+	// pr_info("SPP: access_map[0]: %u\n", access_map[0]);
 	mutex_lock(&kvm->slots_lock);
 	ret = kvm_spp_get_permission(kvm, gfn, npages, access_map);
 	mutex_unlock(&kvm->slots_lock);
-	pr_info("SPP: access_map[0]: %u\n", access_map[0]);
+	// pr_info("SPP: access_map[0]: %u\n", access_map[0]);
 
 	return ret;
 }

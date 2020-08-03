@@ -5407,7 +5407,7 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 	gfn_t gfn, gfn_end;
 	u32 *access;
 	gpa_t gpa;
-	pr_info("SPP: handle_spp");
+	// pr_info("SPP: handle_spp");
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 

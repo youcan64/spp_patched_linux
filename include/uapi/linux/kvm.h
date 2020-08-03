@@ -245,6 +245,7 @@ struct kvm_hyperv_exit {
 #define KVM_EXIT_HYPERV           27
 #define KVM_EXIT_ARM_NISV         28
 #define KVM_EXIT_SPP              29
+#define KVM_EXIT_SPP_LOG_FULL     30
 
 /* For KVM_EXIT_INTERNAL_ERROR */
 /* Emulate instruction failed. */
@@ -1281,6 +1282,7 @@ struct kvm_vfio_spapr_tce {
 #define KVM_SET_IDENTITY_MAP_ADDR _IOW(KVMIO,  0x48, __u64)
 #define KVM_SUBPAGES_GET_ACCESS   _IOR(KVMIO,  0x49, __u64)
 #define KVM_SUBPAGES_SET_ACCESS   _IOW(KVMIO,  0x4a, __u64)
+#define KVM_GET_SPP_LOG   _IOW(KVMIO,  0x4b, struct kvm_spp_log)
 
 /* enable ucontrol for s390 */
 struct kvm_s390_ucas_mapping {

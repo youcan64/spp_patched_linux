@@ -39,6 +39,7 @@
 #include <linux/hash.h>
 #include <linux/kern_levels.h>
 #include <linux/kthread.h>
+#include <linux/time.h>
 
 #include <asm/page.h>
 #include <asm/pat.h>
@@ -3582,6 +3583,37 @@ static bool is_access_allowed(u32 fault_err_code, u64 spte)
 	return spte & PT_PRESENT_MASK;
 }
 
+u64 SUBPAGE_MASK = 0xfff;
+int spp_log_index = 0;
+
+static bool fix_subpage_fault(struct kvm *kvm, gpa_t cr2_or_gpa)
+{
+	bool r = false;
+	u32 before_access_map, after_access_map;
+	u64 gfn = cr2_or_gpa >> 12;
+	u64 subpage = (cr2_or_gpa & 0xfff) >> 7;
+
+	kvm_vm_ioctl_get_subpages(kvm, gfn, 1, &before_access_map);
+	after_access_map = before_access_map | (1 << subpage);
+	kvm_vm_ioctl_set_subpages(kvm, gfn, 1, &after_access_map);
+	// pr_info(", SPP, %llu, %llu, %u, %u\n", gfn, subpage, before_access_map, after_access_map);
+	trace_printk("SPP, %llu, %llu\n", gfn, subpage);
+	// kvm->spp_log[kvm->spp_log_index].subpage = cr2_or_gpa >> 7;
+	// getnstimeofday(&kvm->spp_log[kvm->spp_log_index].time);
+	// kvm->spp_log_index++;
+	// if(kvm->spp_log_index == SPP_LOG_SIZE)
+	// {
+	// 	// int i;
+	// 	// spp_log_index = 0;
+	// 	// for(i=0; i<SPP_LOG_SIZE;i++)
+	// 	// {
+	// 	// 	pr_info(", %ld, %ld, %llu\n", kvm->spp_log[i].time.tv_sec, kvm->spp_log[i].time.tv_nsec, kvm->spp_log[i].subpage);
+	// 	// }
+	// 	r = true;
+	// }
+	return r;
+}
+
 /*
  * Return value:
  * - true: let the vcpu to access on the same address again.
@@ -3597,8 +3629,8 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 	u64 spte = 0ull;
 	uint retry_count = 0;
 	vcpu->run->exit_reason = KVM_EXIT_UNKNOWN;
-	pr_info("SPP: fast_page_fault\n");
-	pr_info("SPP: addr: %llu\n", cr2_or_gpa);
+	// pr_info("SPP: fast_page_fault\n");
+	// pr_info("SPP: addr: %llu\n", cr2_or_gpa);
 
 	if (!VALID_PAGE(vcpu->arch.mmu->root_hpa))
 		return false;
@@ -3654,15 +3686,16 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 			 * the next step.
 			 */
 			if (spte & PT_SPP_MASK) {
-				int len = kvm_x86_ops->get_insn_len(vcpu);
+				// int len = kvm_x86_ops->get_insn_len(vcpu);
 
 				fault_handled = true;
-				vcpu->run->exit_reason = KVM_EXIT_SPP;
-				vcpu->run->spp.addr = cr2_or_gpa;
-				vcpu->run->spp.insn_len = len;
-				trace_kvm_spp_induced_page_fault(vcpu,
-								 cr2_or_gpa,
-								 len);
+				if (fix_subpage_fault(vcpu->kvm, cr2_or_gpa)) {
+					vcpu->run->exit_reason = KVM_EXIT_SPP_LOG_FULL;
+					pr_info("KVM_EXIT_SPP_LOG_FULL\n");
+				}
+				// trace_kvm_spp_induced_page_fault(vcpu,
+								//  cr2_or_gpa,
+								//  len);
 				break;
 			}
 
@@ -5650,7 +5683,7 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, u64 error_code,
 					       lower_32_bits(error_code),
 					       false);
 
-		if (vcpu->run->exit_reason == KVM_EXIT_SPP)
+		if (vcpu->run->exit_reason == KVM_EXIT_SPP || vcpu->run->exit_reason == KVM_EXIT_SPP_LOG_FULL)
 			r = RET_PF_USERSPACE;
 
 		WARN_ON(r == RET_PF_INVALID);

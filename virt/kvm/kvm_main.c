@@ -3394,6 +3394,14 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = kvm_vm_ioctl_get_dirty_log(kvm, &log);
 		break;
 	}
+	case KVM_GET_SPP_LOG: {
+		r = -EFAULT;
+		if (copy_to_user(argp, kvm->spp_log, sizeof(struct kvm_spp_log)*SPP_LOG_SIZE))
+			goto out;
+		kvm->spp_log_index = 0;
+		r = 0;
+		break;
+	}
 #ifdef CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT
 	case KVM_CLEAR_DIRTY_LOG: {
 		struct kvm_clear_dirty_log log;

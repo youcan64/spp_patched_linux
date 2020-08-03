@@ -440,6 +440,13 @@ struct kvm_memslots {
 	int used_slots;
 };
 
+#define SPP_LOG_SIZE 512
+
+struct kvm_spp_log {
+	u64 subpage;
+	struct timespec time;
+};
+
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
@@ -501,6 +508,8 @@ struct kvm {
 	struct srcu_struct srcu;
 	struct srcu_struct irq_srcu;
 	pid_t userspace_pid;
+	int spp_log_index;
+	struct kvm_spp_log spp_log[SPP_LOG_SIZE];
 };
 
 #define kvm_err(fmt, ...) \
