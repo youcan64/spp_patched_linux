@@ -3586,16 +3586,29 @@ static bool is_access_allowed(u32 fault_err_code, u64 spte)
 u64 SUBPAGE_MASK = 0xfff;
 int spp_log_index = 0;
 
-static bool fix_subpage_fault(struct kvm *kvm, gpa_t cr2_or_gpa)
+static bool fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 {
 	bool r = false;
 	u32 before_access_map, after_access_map;
 	u64 gfn = cr2_or_gpa >> 12;
 	u64 subpage = (cr2_or_gpa & 0xfff) >> 7;
+	struct kvm_memory_slot *slot;
+	unsigned long idx;
 
-	kvm_vm_ioctl_get_subpages(kvm, gfn, 1, &before_access_map);
+	// kvm_vm_ioctl_get_subpages(kvm, gfn, 1, &before_access_map);
+	// kvm_vm_ioctl_set_subpages(kvm, gfn, 1, &after_access_map);
+
+
+	spin_lock(&vcpu->kvm->mmu_lock);
+	slot = gfn_to_memslot(vcpu->kvm, gfn);
+	before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
+	idx = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
 	after_access_map = before_access_map | (1 << subpage);
-	kvm_vm_ioctl_set_subpages(kvm, gfn, 1, &after_access_map);
+	*&slot->arch.subpage_wp_info[idx] = after_access_map;
+
+	kvm_spp_setup_structure(vcpu, after_access_map, gfn);
+	spin_unlock(&vcpu->kvm->mmu_lock);
+
 	// pr_info(", SPP, %llu, %llu, %u, %u\n", gfn, subpage, before_access_map, after_access_map);
 	trace_printk("SPP, %llu, %llu\n", gfn, subpage);
 	// kvm->spp_log[kvm->spp_log_index].subpage = cr2_or_gpa >> 7;
@@ -3630,7 +3643,6 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 	uint retry_count = 0;
 	vcpu->run->exit_reason = KVM_EXIT_UNKNOWN;
 	// pr_info("SPP: fast_page_fault\n");
-	// pr_info("SPP: addr: %llu\n", cr2_or_gpa);
 
 	if (!VALID_PAGE(vcpu->arch.mmu->root_hpa))
 		return false;
@@ -3689,7 +3701,7 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 				// int len = kvm_x86_ops->get_insn_len(vcpu);
 
 				fault_handled = true;
-				if (fix_subpage_fault(vcpu->kvm, cr2_or_gpa)) {
+				if (fix_subpage_fault(vcpu, cr2_or_gpa)) {
 					vcpu->run->exit_reason = KVM_EXIT_SPP_LOG_FULL;
 					pr_info("KVM_EXIT_SPP_LOG_FULL\n");
 				}

@@ -146,7 +146,7 @@ static void link_spp_shadow_page(struct kvm_vcpu *vcpu, u64 *sptep,
 static u64 format_spp_spte(u32 spp_wp_bitmap)
 {
 	u64 new_spte = 0;
-	int i = 0;
+	// int i = 0;
 
 	/*
 	 * One 4K-page contains 32 sub-pages, they're flagged in even bits in
@@ -154,7 +154,8 @@ static u64 format_spp_spte(u32 spp_wp_bitmap)
 	 * permission bitmap to 8-byte SPP L4E format.
 	 */
 	// for (i = 0; i < 32; i++)
-		// new_spte |= (spp_wp_bitmap & BIT_ULL(i)) << i;
+	// 	new_spte |= (spp_wp_bitmap & BIT_ULL(i)) << i;
+
 	new_spte |= (spp_wp_bitmap & BIT_ULL(0)) << 0;
 	new_spte |= (spp_wp_bitmap & BIT_ULL(1)) << 1;
 	new_spte |= (spp_wp_bitmap & BIT_ULL(2)) << 2;
@@ -187,7 +188,6 @@ static u64 format_spp_spte(u32 spp_wp_bitmap)
 	new_spte |= (spp_wp_bitmap & BIT_ULL(29)) << 29;
 	new_spte |= (spp_wp_bitmap & BIT_ULL(30)) << 30;
 	new_spte |= (spp_wp_bitmap & BIT_ULL(31)) << 31;
-
 
 	return new_spte;
 }
@@ -224,9 +224,12 @@ int kvm_spp_setup_structure(struct kvm_vcpu *vcpu,
 		return -EFAULT;
 
 	for_each_shadow_spp_entry(vcpu, (u64)gfn << PAGE_SHIFT, iter) {
+		// trace_printk("spp_entry: level: %d, entry: %llu\n", iter.level, *iter.sptep);
+
 		if (iter.level == PT_PAGE_TABLE_LEVEL) {
 			spp_spte = format_spp_spte(access_map);
 			old_spte = mmu_spte_get_lockless(iter.sptep);
+			// trace_printk("spte: old: %llu, new: %llu\n", old_spte, spp_spte);
 			if (old_spte != spp_spte)
 				spp_spte_set(iter.sptep, spp_spte);
 			ret = 0;
@@ -248,12 +251,53 @@ int kvm_spp_setup_structure(struct kvm_vcpu *vcpu,
 			spp_spte |= PT_PRESENT_MASK;
 			spp_spte_set(iter.sptep, spp_spte);
 		}
+		// trace_printk("spp_entry: level: %d, entry: %llu\n", iter.level, *iter.sptep);
 	}
 
 	kvm_flush_remote_tlbs(vcpu->kvm);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(kvm_spp_setup_structure);
+
+// my code
+// int kvm_spp_setup_structure(struct kvm_vcpu *vcpu,
+// 			    u32 access_map, gfn_t gfn)
+// {
+// 	struct kvm_shadow_walk_iterator iter, base_iter;
+// 	struct kvm_mmu_page *sp;
+// 	gfn_t pseudo_gfn;
+// 	u64 old_spte, spp_spte;
+// 	int ret = -EFAULT;
+
+// 	if (!VALID_PAGE(vcpu->kvm->arch.sppt_root))
+// 		return -EFAULT;
+
+// 	for_each_shadow_spp_entry(vcpu, (u64)gfn << PAGE_SHIFT, iter) {
+// 		if (!is_shadow_present_pte(*iter.sptep)) {
+// 			u64 base_addr = iter.addr;
+
+// 			base_addr &= PT64_LVL_ADDR_MASK(iter.level);
+// 			pseudo_gfn = base_addr >> PAGE_SHIFT;
+// 			sp = kvm_spp_get_page(vcpu, pseudo_gfn,
+// 					      iter.level - 1);
+// 			link_spp_shadow_page(vcpu, iter.sptep, sp);
+// 		} else if (iter.level == PT_DIRECTORY_LEVEL &&
+// 			   !(spp_spte & PT_PRESENT_MASK) &&
+// 			   (spp_spte & PT64_BASE_ADDR_MASK)) {
+// 			spp_spte = mmu_spte_get_lockless(iter.sptep);
+// 			spp_spte |= PT_PRESENT_MASK;
+// 			spp_spte_set(iter.sptep, spp_spte);
+// 		}
+
+// 		if (iter.level == PT_DIRECTORY_LEVEL) {
+// 			break;
+// 		}
+// 	}
+
+// 	kvm_flush_remote_tlbs(vcpu->kvm);
+// 	return ret;
+// }
+// EXPORT_SYMBOL_GPL(kvm_spp_setup_structure);
 
 int spp_flush_sppt(struct kvm *kvm, u64 gfn_base, u32 npages)
 {
