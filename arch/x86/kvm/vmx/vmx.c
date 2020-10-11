@@ -5460,7 +5460,7 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 	if (slot) {
 		access = gfn_to_subpage_wp_info(slot, gfn);
 		if (access && *access != FULL_SPP_ACCESS) {
-			trace_printk("kvm_spp_setup_structure, %llu, %llu\n", gpa, gfn);
+			// trace_printk("kvm_spp_setup_structure, %llu, %llu\n", gpa, gfn);
 			getnstimeofday(&start_time);
 			kvm_spp_setup_structure(vcpu, *access, gfn);
 			getnstimeofday(&end_time);
