@@ -3584,7 +3584,7 @@ static bool is_access_allowed(u32 fault_err_code, u64 spte)
 }
 
 static unsigned long tasks_offset = 0x398;
-static unsigned long pid_offset = 0x498;
+// static unsigned long pid_offset = 0x498;
 static unsigned long name_offset = 0x650;
 static unsigned long mm_offset = 0x3e8;
 static unsigned long mmap_offset = 0x0;
@@ -3618,15 +3618,17 @@ static int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
 {
 	gpa_t gpa;
 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
+	// if(gva == 0xffffffff82412b68)
+	// 	trace_printk("SPP: gpa: 0x%llx\n", gpa);
 	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(gva_t));
 }
 
-static int get_int_from_gva(struct kvm_vcpu *vcpu, gva_t gva, int *val)
-{
-	gpa_t gpa;
-	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
-	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(int));
-}
+// static int get_int_from_gva(struct kvm_vcpu *vcpu, gva_t gva, int *val)
+// {
+// 	gpa_t gpa;
+// 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
+// 	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(int));
+// }
 
 static int get_string_from_gva(struct kvm_vcpu *vcpu, u64 gva, char *val, int length)
 {
@@ -3675,7 +3677,7 @@ static void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filena
 		return;
 	if (!vm_file)
 	{
-		filename = "anonymous";
+		strcpy(filename, "anonymous");
 		return;
 	}
 
@@ -3698,28 +3700,28 @@ static void get_filename(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t mm_addr,
 	// search brk
 	if( hit_in_area_from_address_pointer(vcpu, target_gpa, mm_addr + start_brk_offset, mm_addr + brk_offset) )
 	{
-		filename = "heap";
+		strcpy(filename, "heap");
 		return;
 	}
 
 	// search stack
 	if( hit_in_area_from_address_pointer(vcpu, target_gpa, mm_addr + start_stack_offset, mm_addr + arg_start_offset) )
 	{
-		filename = "stack";
+		strcpy(filename, "stack");
 		return;
 	}
 
 	// search arg
 	if( hit_in_area_from_address_pointer(vcpu, target_gpa, mm_addr + arg_start_offset, mm_addr + arg_end_offset) )
 	{
-		filename = "arg";
+		strcpy(filename, "arg");
 		return;
 	}
 
 	// search env
 	if( hit_in_area_from_address_pointer(vcpu, target_gpa, mm_addr + env_start_offset, mm_addr + env_end_offset) )
 	{
-		filename = "env";
+		strcpy(filename, "env");
 		return;
 	}
 
@@ -3749,7 +3751,7 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 	gva_t cur_process;
 	gva_t mm_addr, pgd_addr;
 	gpa_t pgd_gpa;
-	int pid;
+	// int pid;
 	char procname[name_length];
 	char filename[name_length];
 	int res;
@@ -3757,7 +3759,7 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 	gpa_t subpage = (gpa & 0xfff) >> 7;
 	procname[0] = '\0';
 	filename[0] = '\0';
-	
+
 	cur_list_entry = list_head;
 	while(1) {
 		cur_process = cur_list_entry - tasks_offset;
@@ -3772,15 +3774,15 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 			break;
 		if(mm_addr)
 		{
-			res = get_string_from_gva(vcpu, cur_process + name_offset, procname, name_length);
-			if( res != 0)
-				break;
 			res = get_addr_from_gva(vcpu, mm_addr + pgd_offset, &pgd_addr);
 			if( res != 0)
 				break;
 			pgd_gpa = kvm_mmu_gva_to_gpa_system(vcpu, pgd_addr, NULL);
 			if(pgd_gpa == vcpu->arch.cr3 || pgd_gpa == (vcpu->arch.cr3 & ~0x1fff))
 			{
+				res = get_string_from_gva(vcpu, cur_process + name_offset, procname, name_length);
+				if( res != 0)
+					break;
 				get_filename(vcpu, gpa, mm_addr, filename);
 				break;
 			}
@@ -3792,7 +3794,7 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 			break;
 		cur_list_entry = next_list_entry;
 	}
-	trace_printk("SPP: 0x%llx, 0x%llx, %s, %s\n", gfn, subpage, procname, filename);
+	trace_printk("{0x%llx, 0x%llx, %s, %s}\n", gfn, subpage, procname, filename);
 }
 
 static bool fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
@@ -3804,10 +3806,6 @@ static bool fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 	struct kvm_memory_slot *slot;
 	unsigned long idx;
 
-	// kvm_vm_ioctl_get_subpages(kvm, gfn, 1, &before_access_map);
-	// kvm_vm_ioctl_set_subpages(kvm, gfn, 1, &after_access_map);
-
-
 	spin_lock(&vcpu->kvm->mmu_lock);
 	slot = gfn_to_memslot(vcpu->kvm, gfn);
 	before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
@@ -3817,22 +3815,8 @@ static bool fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 
 	kvm_spp_setup_structure(vcpu, after_access_map, gfn);
 	spin_unlock(&vcpu->kvm->mmu_lock);
-
-	// pr_info(", SPP, %llu, %llu, %u, %u\n", gfn, subpage, before_access_map, after_access_map);
 	find_mapping(vcpu, cr2_or_gpa);
-	// kvm->spp_log[kvm->spp_log_index].subpage = cr2_or_gpa >> 7;
-	// getnstimeofday(&kvm->spp_log[kvm->spp_log_index].time);
-	// kvm->spp_log_index++;
-	// if(kvm->spp_log_index == SPP_LOG_SIZE)
-	// {
-	// 	// int i;
-	// 	// spp_log_index = 0;
-	// 	// for(i=0; i<SPP_LOG_SIZE;i++)
-	// 	// {
-	// 	// 	pr_info(", %ld, %ld, %llu\n", kvm->spp_log[i].time.tv_sec, kvm->spp_log[i].time.tv_nsec, kvm->spp_log[i].subpage);
-	// 	// }
-	// 	r = true;
-	// }
+
 	return r;
 }
 
