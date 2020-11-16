@@ -3586,7 +3586,8 @@ static bool is_access_allowed(u32 fault_err_code, u64 spte)
 static unsigned long tasks_offset = 0x398;
 // static unsigned long pid_offset = 0x498;
 static unsigned long name_offset = 0x650;
-static unsigned long mm_offset = 0x3e8;
+// static unsigned long mm_offset = 0x3e8;
+static unsigned long active_mm_offset = 0x3f0;
 static unsigned long mmap_offset = 0x0;
 static unsigned long pgd_offset = 0x50;
 // static unsigned long start_code_offset = 0x100;
@@ -3614,7 +3615,7 @@ static u64 list_head = 0xffffffff82412b18;
 // static int spp_log_index = 0;
 static int name_length = 128;
 
-static int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
+static inline int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
 {
 	gpa_t gpa;
 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
@@ -3623,21 +3624,21 @@ static int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
 	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(gva_t));
 }
 
-// static int get_int_from_gva(struct kvm_vcpu *vcpu, gva_t gva, int *val)
+// static inline int get_int_from_gva(struct kvm_vcpu *vcpu, gva_t gva, int *val)
 // {
 // 	gpa_t gpa;
 // 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
 // 	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(int));
 // }
 
-static int get_string_from_gva(struct kvm_vcpu *vcpu, u64 gva, char *val, int length)
+static inline int get_string_from_gva(struct kvm_vcpu *vcpu, u64 gva, char *val, int length)
 {
 	gpa_t gpa;
 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
 	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(char) * length);
 }
 
-static bool hit_in_area(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t start, gva_t end )
+static inline bool hit_in_area(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t start, gva_t end )
 {
 	gva_t gva;
 	gpa_t gpa;
@@ -3654,7 +3655,7 @@ static bool hit_in_area(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t start, gv
 	return false;
 }
 
-static bool hit_in_area_from_address_pointer(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t start_pointer, gva_t end_pointer)
+static inline bool hit_in_area_from_address_pointer(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t start_pointer, gva_t end_pointer)
 {
 	gva_t start, end;
 	int res;
@@ -3667,7 +3668,7 @@ static bool hit_in_area_from_address_pointer(struct kvm_vcpu *vcpu, gpa_t target
 	return hit_in_area(vcpu, target_gpa, start, end);
 }
 
-static void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filename)
+static inline void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filename)
 {
 	gva_t vm_file, f_path, dentry, d_iname;
 	int res;
@@ -3692,7 +3693,7 @@ static void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filena
 	return;
 }
 
-static void get_filename(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t mm_addr, char *filename)
+static inline void get_filename(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t mm_addr, char *filename)
 {
 	gva_t vma;
 	int res;
@@ -3745,7 +3746,7 @@ static void get_filename(struct kvm_vcpu *vcpu, gpa_t target_gpa, gva_t mm_addr,
 	return;
 }
 
-static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
+static inline void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 {
 	gva_t cur_list_entry, next_list_entry;
 	gva_t cur_process;
@@ -3769,7 +3770,11 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 		// res = get_string_from_gva(vcpu, cur_process + name_offset, procname, name_length);
 		// if( res != 0)
 		// 	break;
-		res = get_addr_from_gva(vcpu, cur_process + mm_offset, &mm_addr);
+		
+		// mm: exists only in user process
+		// active_mm: mm struct actually in used (exists even in kernel process)
+		// res = get_addr_from_gva(vcpu, cur_process + mm_offset, &mm_addr);
+		res = get_addr_from_gva(vcpu, cur_process + active_mm_offset, &mm_addr);
 		if( res != 0)
 			break;
 		if(mm_addr)
@@ -3797,9 +3802,8 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 	trace_printk("{0x%llx, 0x%llx, %s, %s}\n", gfn, subpage, procname, filename);
 }
 
-static bool fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
+static inline void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 {
-	bool r = false;
 	u32 before_access_map, after_access_map;
 	u64 gfn = cr2_or_gpa >> 12;
 	u64 subpage = (cr2_or_gpa & 0xfff) >> 7;
@@ -3817,7 +3821,7 @@ static bool fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 	spin_unlock(&vcpu->kvm->mmu_lock);
 	find_mapping(vcpu, cr2_or_gpa);
 
-	return r;
+	return;
 }
 
 /*
@@ -3891,16 +3895,8 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 			 * the next step.
 			 */
 			if (spte & PT_SPP_MASK) {
-				// int len = kvm_x86_ops->get_insn_len(vcpu);
-
 				fault_handled = true;
-				if (fix_subpage_fault(vcpu, cr2_or_gpa)) {
-					vcpu->run->exit_reason = KVM_EXIT_SPP_LOG_FULL;
-					pr_info("KVM_EXIT_SPP_LOG_FULL\n");
-				}
-				// trace_kvm_spp_induced_page_fault(vcpu,
-								//  cr2_or_gpa,
-								//  len);
+				fix_subpage_fault(vcpu, cr2_or_gpa);
 				break;
 			}
 
