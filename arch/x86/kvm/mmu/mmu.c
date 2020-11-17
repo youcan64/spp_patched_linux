@@ -3598,16 +3598,22 @@ const static gva_t f_path_offset = 0x10;
 const static gva_t dentry_offset = 0x8;
 const static gva_t d_iname_offset = 0x38;
 
+const static gva_t tasks_offset = 0x398;
+const static gva_t name_offset = 0x650;
+const static gva_t active_mm_offset = 0x3f0;
+
+const static u64 list_head = 0xffffffff82412b18;
+
 const static int name_length = 128;
 
-static inline int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
+static int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
 {
 	gpa_t gpa;
 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
 	return kvm_read_guest(vcpu->kvm, gpa, val, sizeof(gva_t));
 }
 
-static inline int get_string_from_gva(struct kvm_vcpu *vcpu, u64 gva, char *val, int length)
+static int get_string_from_gva(struct kvm_vcpu *vcpu, u64 gva, char *val, int length)
 {
 	gpa_t gpa;
 	gpa = kvm_mmu_gva_to_gpa_system(vcpu, gva, NULL);
@@ -3648,7 +3654,7 @@ static gva_t search_rb_tree(struct kvm_vcpu *vcpu, gva_t rb_node_addr)
 	return vma_addr;
 }
 
-static inline void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filename)
+static void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filename)
 {
 	gva_t vm_file, f_path, dentry, d_iname;
 	int res;
@@ -3673,19 +3679,13 @@ static inline void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char 
 	return;
 }
 
-static inline void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
+static void get_filename(struct kvm_vcpu *vcpu, gpa_t gpa, char *filename)
 {
-	char procname[name_length];
-	char filename[name_length];
 	int res;
 	gva_t page_addr, mapping_addr, rb_root_addr, rb_node_addr, vma_addr;
 	gpa_t gfn = gpa >> 12;
-	gpa_t subpage = (gpa & 0xfff) >> 7;
-	procname[0] = '\0';
-	filename[0] = '\0';
 	
 	page_addr = guest_vmemmap + gfn * struct_page_size;
-	trace_printk("page_address: 0x%lx\n", page_addr);
 
 	res = get_addr_from_gva(vcpu, page_addr + mapping_offset, &mapping_addr);
 	if(res != 0)
@@ -3706,15 +3706,59 @@ static inline void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 		if(vma_addr)
 			get_filename_from_vma(vcpu, vma_addr, filename);
 	}
-	// else
-	// {
-	// }
+}
 
+static void get_procname(struct kvm_vcpu *vcpu, gpa_t gpa, char *procname)
+{
+	gva_t cur_list_entry, next_list_entry;
+	gva_t cur_process;
+	gva_t mm_addr, pgd_addr;
+	gpa_t pgd_gpa;
+	int res;
+
+	cur_list_entry = list_head;
+	while(1) {
+		cur_process = cur_list_entry - tasks_offset;
+		res = get_addr_from_gva(vcpu, cur_process + active_mm_offset, &mm_addr);
+		if( res != 0)
+			return;
+		if(mm_addr)
+		{
+			res = get_addr_from_gva(vcpu, mm_addr + pgd_offset, &pgd_addr);
+			if( res != 0)
+				return;
+			pgd_gpa = kvm_mmu_gva_to_gpa_system(vcpu, pgd_addr, NULL);
+			if(pgd_gpa == vcpu->arch.cr3 || pgd_gpa == (vcpu->arch.cr3 & ~0x1fff))
+			{
+				res = get_string_from_gva(vcpu, cur_process + name_offset, procname, name_length);
+				return;
+			}
+		}
+		res = get_addr_from_gva(vcpu, cur_list_entry, &next_list_entry);
+		if( res != 0)
+			return;
+		if (next_list_entry == list_head)
+			return;
+		cur_list_entry = next_list_entry;
+	}
+}
+
+static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
+{
+	char procname[name_length];
+	char filename[name_length];
+	gpa_t gfn = gpa >> 12;
+	gpa_t subpage = (gpa & 0xfff) >> 7;
+	procname[0] = '\0';
+	filename[0] = '\0';
+
+	get_procname(vcpu, gpa, procname);
+	get_filename(vcpu, gpa, filename);
 
 	trace_printk("{0x%llx, 0x%llx, %s, %s}\n", gfn, subpage, procname, filename);
 }
 
-static inline void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
+static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 {
 	u32 before_access_map, after_access_map;
 	u64 gfn = cr2_or_gpa >> 12;
