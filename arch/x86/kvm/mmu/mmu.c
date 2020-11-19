@@ -3602,6 +3602,11 @@ const static gva_t tasks_offset = 0x398;
 const static gva_t name_offset = 0x650;
 const static gva_t active_mm_offset = 0x3f0;
 
+const static gva_t start_brk_offset = 0x120;
+const static gva_t brk_offset = 0x128;
+const static gva_t start_stack_offset = 0x130;
+const static gva_t arg_start_offset = 0x138;
+
 const static u64 list_head = 0xffffffff82412b18;
 
 const static int name_length = 128;
@@ -3656,7 +3661,7 @@ static gva_t search_rb_tree(struct kvm_vcpu *vcpu, gva_t rb_node_addr)
 
 static void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filename)
 {
-	gva_t vm_file, f_path, dentry, d_iname;
+	gva_t vm_file, f_path, dentry, d_iname, mm_addr, vma_start, heap_start, heap_end, stack_start, stack_end;
 	int res;
 
 	res = get_addr_from_gva(vcpu, vma + file_offset, &vm_file);
@@ -3664,6 +3669,36 @@ static void get_filename_from_vma(struct kvm_vcpu *vcpu, gva_t vma, char *filena
 		return;
 	if (!vm_file)
 	{
+		res = get_addr_from_gva(vcpu, vma, &vma_start);
+		if(res != 0)
+			return;
+		res = get_addr_from_gva(vcpu, vma + vm_mm_offset, &mm_addr);
+		if(res != 0)
+			return;
+		res = get_addr_from_gva(vcpu, mm_addr + start_brk_offset, &heap_start);
+		if(res != 0)
+			return;
+		res = get_addr_from_gva(vcpu, mm_addr + brk_offset, &heap_end);
+		if(res != 0)
+			return;
+		if(heap_start <= vma_start && vma_start < heap_end)
+		{
+			strcpy(filename, "heap");
+			return;
+		}
+
+		res = get_addr_from_gva(vcpu, mm_addr + start_stack_offset, &stack_start);
+		if(res != 0)
+			return;
+		res = get_addr_from_gva(vcpu, mm_addr + arg_start_offset, &stack_end);
+		if(res != 0)
+			return;
+		if(stack_start <= vma_start && vma_start < stack_end)
+		{
+			strcpy(filename, "stack");
+			return;
+		}
+
 		strcpy(filename, "anonymous");
 		return;
 	}
