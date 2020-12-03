@@ -3806,9 +3806,15 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 
 	spin_lock(&vcpu->kvm->mmu_lock);
 	slot = gfn_to_memslot(vcpu->kvm, gfn);
-	before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
 	idx = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
-	after_access_map = before_access_map | (1 << subpage);
+
+	// subpage
+	// before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
+	// after_access_map = before_access_map | (1 << subpage);
+
+	// fullpage
+	after_access_map = FULL_SPP_ACCESS;
+
 	*&slot->arch.subpage_wp_info[idx] = after_access_map;
 
 	kvm_spp_setup_structure(vcpu, after_access_map, gfn);
@@ -3894,7 +3900,9 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 			 * the next step.
 			 */
 			if (spte & PT_SPP_MASK) {
-				vcpu->kvm->dirty_size += 0x80;
+
+				// vcpu->kvm->dirty_size += 0x80; // subpage
+				vcpu->kvm->dirty_size += 0x1000; // fullpage
 				fault_handled = true;
 				fix_subpage_fault(vcpu, cr2_or_gpa);
 				break;
