@@ -3611,6 +3611,8 @@ const static u64 list_head = 0xffffffff82412b18;
 
 const static int name_length = 128;
 
+gpa_t pre_spp_fault_addr = 0x0;
+
 static int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
 {
 	gpa_t gpa;
@@ -3726,6 +3728,7 @@ static void get_filename(struct kvm_vcpu *vcpu, gpa_t gpa, char *filename)
 	if(res != 0)
 	{
 		trace_printk("failed to get mapping_address\n");
+		return;
 	}
 
 	if( (mapping_addr & PAGE_MAPPING_FLAGS) == PAGE_MAPPING_ANON)
@@ -3810,7 +3813,12 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 
 	kvm_spp_setup_structure(vcpu, after_access_map, gfn);
 	spin_unlock(&vcpu->kvm->mmu_lock);
-	find_mapping(vcpu, cr2_or_gpa);
+
+	// find_mapping(vcpu, cr2_or_gpa);
+
+	if(pre_spp_fault_addr) 
+		find_mapping(vcpu, pre_spp_fault_addr);
+	pre_spp_fault_addr = cr2_or_gpa;
 
 	return;
 }
@@ -3886,6 +3894,7 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 			 * the next step.
 			 */
 			if (spte & PT_SPP_MASK) {
+				vcpu->kvm->dirty_size += 0x80;
 				fault_handled = true;
 				fix_subpage_fault(vcpu, cr2_or_gpa);
 				break;

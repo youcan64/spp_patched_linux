@@ -432,6 +432,7 @@ int spp_init(struct kvm *kvm)
 	}
 
 	kvm->spp_log_index = 0;
+	kvm->dirty_size = 0;
 	kvm->arch.spp_active = true;
 	return 0;
 }

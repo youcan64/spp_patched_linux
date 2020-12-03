@@ -3402,6 +3402,15 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = 0;
 		break;
 	}
+	case KVM_GET_DIRTY_SIZE: {
+		r = -EFAULT;
+		if (copy_to_user(argp, &kvm->dirty_size, sizeof(unsigned long)))
+			goto out;
+		kvm->dirty_size = 0;
+		trace_printk("dirty_log_reset\n");
+		r = 0;
+		break;
+	}
 #ifdef CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT
 	case KVM_CLEAR_DIRTY_LOG: {
 		struct kvm_clear_dirty_log log;

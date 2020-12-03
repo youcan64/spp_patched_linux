@@ -1283,6 +1283,7 @@ struct kvm_vfio_spapr_tce {
 #define KVM_SUBPAGES_GET_ACCESS   _IOR(KVMIO,  0x49, __u64)
 #define KVM_SUBPAGES_SET_ACCESS   _IOW(KVMIO,  0x4a, __u64)
 #define KVM_GET_SPP_LOG   _IOW(KVMIO,  0x4b, struct kvm_spp_log)
+#define KVM_GET_DIRTY_SIZE   _IOW(KVMIO,  0x4c, unsigned long)
 
 /* enable ucontrol for s390 */
 struct kvm_s390_ucas_mapping {
