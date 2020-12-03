@@ -509,6 +509,7 @@ struct kvm {
 	struct srcu_struct irq_srcu;
 	pid_t userspace_pid;
 	int spp_log_index;
+	unsigned long dirty_size;
 	struct kvm_spp_log spp_log[SPP_LOG_SIZE];
 };
 
