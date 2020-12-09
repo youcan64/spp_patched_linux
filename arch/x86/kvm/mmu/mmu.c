@@ -3793,7 +3793,7 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 	get_procname(vcpu, gpa, procname);
 	get_filename(vcpu, gpa, filename);
 
-	trace_printk("{0x%llx, 0x%llx, %s, %s}\n", gfn, subpage, procname, filename);
+	trace_printk("{0x%llx, 0x%llx, %s, %s, 0x%lx}\n", gfn, subpage, procname, filename, kvm_rip_read(vcpu));
 }
 
 static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
@@ -3809,11 +3809,11 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 	idx = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
 
 	// subpage
-	// before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
-	// after_access_map = before_access_map | (1 << subpage);
+	before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
+	after_access_map = before_access_map | (1 << subpage);
 
 	// fullpage
-	after_access_map = FULL_SPP_ACCESS;
+	// after_access_map = FULL_SPP_ACCESS;
 
 	*&slot->arch.subpage_wp_info[idx] = after_access_map;
 
@@ -3901,8 +3901,8 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 			 */
 			if (spte & PT_SPP_MASK) {
 
-				// vcpu->kvm->dirty_size += 0x80; // subpage
-				vcpu->kvm->dirty_size += 0x1000; // fullpage
+				vcpu->kvm->dirty_size += 0x80; // subpage
+				// vcpu->kvm->dirty_size += 0x1000; // fullpage
 				fault_handled = true;
 				fix_subpage_fault(vcpu, cr2_or_gpa);
 				break;

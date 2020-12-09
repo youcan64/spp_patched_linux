@@ -5407,7 +5407,6 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 	gfn_t gfn, gfn_end;
 	u32 *access;
 	gpa_t gpa;
-	struct timespec start_time, end_time;
 	// pr_info("SPP: handle_spp");
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
@@ -5461,9 +5460,7 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 		access = gfn_to_subpage_wp_info(slot, gfn);
 		if (access && *access != FULL_SPP_ACCESS) {
 			// trace_printk("kvm_spp_setup_structure, %llu, %llu\n", gpa, gfn);
-			getnstimeofday(&start_time);
 			kvm_spp_setup_structure(vcpu, *access, gfn);
-			getnstimeofday(&end_time);
 		}
 	}
 	spin_unlock(&vcpu->kvm->mmu_lock);

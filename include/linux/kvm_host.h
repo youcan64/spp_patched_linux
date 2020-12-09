@@ -510,6 +510,7 @@ struct kvm {
 	pid_t userspace_pid;
 	int spp_log_index;
 	unsigned long dirty_size;
+	unsigned long long clocks_in_guest;
 	struct kvm_spp_log spp_log[SPP_LOG_SIZE];
 };
 

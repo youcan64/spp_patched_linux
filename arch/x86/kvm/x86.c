@@ -8185,6 +8185,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	bool req_immediate_exit = false;
 
+	unsigned long long before_clock, after_clock;
+
 	if (kvm_request_pending(vcpu)) {
 		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu)) {
 			if (unlikely(!kvm_x86_ops->get_vmcs12_pages(vcpu))) {
@@ -8339,6 +8341,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	 * result in virtual interrupt delivery.
 	 */
 	local_irq_disable();
+	before_clock = rdtsc();
 	vcpu->mode = IN_GUEST_MODE;
 
 	srcu_read_unlock(&vcpu->kvm->srcu, vcpu->srcu_idx);
@@ -8367,6 +8370,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	if (vcpu->mode == EXITING_GUEST_MODE || kvm_request_pending(vcpu)
 	    || need_resched() || signal_pending(current)) {
 		vcpu->mode = OUTSIDE_GUEST_MODE;
+		after_clock = rdtsc();
+		vcpu->kvm->clocks_in_guest += after_clock - before_clock;
 		smp_wmb();
 		local_irq_enable();
 		preempt_enable();
@@ -8427,6 +8432,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	vcpu->arch.last_guest_tsc = kvm_read_l1_tsc(vcpu, rdtsc());
 
 	vcpu->mode = OUTSIDE_GUEST_MODE;
+	after_clock = rdtsc();
+	vcpu->kvm->clocks_in_guest += after_clock - before_clock;
 	smp_wmb();
 
 	kvm_x86_ops->handle_exit_irqoff(vcpu);
