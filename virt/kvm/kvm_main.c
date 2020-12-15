@@ -3411,6 +3411,13 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = 0;
 		break;
 	}
+	case KVM_GET_CLOCKS_IN_GUEST: {
+		r = -EFAULT;
+		if (copy_to_user(argp, &kvm->clocks_in_guest, sizeof(unsigned long long)))
+			goto out;
+		r = 0;
+		break;
+	}
 #ifdef CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT
 	case KVM_CLEAR_DIRTY_LOG: {
 		struct kvm_clear_dirty_log log;

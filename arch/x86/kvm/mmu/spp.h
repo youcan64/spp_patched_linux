@@ -7,6 +7,9 @@
 #define MAX_ENTRIES_PER_MMUPAGE BIT(9)
 #define SPP_STATUS_VMX_SUPPORT   0x1
 #define SPP_STATUS_EPT_SUPPORT   0x2
+#define SUBPAGE_SHIFT		7
+#define SUBPAGE_SIZE		(_AC(1,UL) << SUBPAGE_SHIFT)
+#define SUBPAGE_MASK		(~(SUBPAGE_SIZE-1))
 
 int spp_init(struct kvm *kvm);
 void kvm_spp_free_memslot(struct kvm_memory_slot *free,

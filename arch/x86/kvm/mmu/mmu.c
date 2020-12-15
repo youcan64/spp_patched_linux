@@ -3611,8 +3611,6 @@ const static u64 list_head = 0xffffffff82412b18;
 
 const static int name_length = 128;
 
-gpa_t pre_spp_fault_addr = 0x0;
-
 static int get_addr_from_gva(struct kvm_vcpu *vcpu, gva_t gva, gva_t *val)
 {
 	gpa_t gpa;
@@ -3781,7 +3779,7 @@ static void get_procname(struct kvm_vcpu *vcpu, gpa_t gpa, char *procname)
 	}
 }
 
-static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
+static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa, unsigned int length)
 {
 	char procname[name_length];
 	char filename[name_length];
@@ -3793,14 +3791,14 @@ static void find_mapping(struct kvm_vcpu *vcpu, gpa_t gpa)
 	get_procname(vcpu, gpa, procname);
 	get_filename(vcpu, gpa, filename);
 
-	trace_printk("{0x%llx, 0x%llx, %s, %s, 0x%lx}\n", gfn, subpage, procname, filename, kvm_rip_read(vcpu));
+	trace_printk("{0x%llx, 0x%llx, %u, %s, %s, 0x%lx}\n", gfn, subpage, length, procname, filename, kvm_rip_read(vcpu));
 }
 
-static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
+static unsigned int INSN_REPSTOSQ = 0xab48f3;
+
+static void fix_spp_vector(struct kvm_vcpu *vcpu, gpa_t gfn, u32 newly_allowed_access)
 {
 	u32 before_access_map, after_access_map;
-	u64 gfn = cr2_or_gpa >> 12;
-	u64 subpage = (cr2_or_gpa & 0xfff) >> 7;
 	struct kvm_memory_slot *slot;
 	unsigned long idx;
 
@@ -3808,25 +3806,59 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 	slot = gfn_to_memslot(vcpu->kvm, gfn);
 	idx = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
 
-	// subpage
 	before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
-	after_access_map = before_access_map | (1 << subpage);
-
-	// fullpage
-	// after_access_map = FULL_SPP_ACCESS;
+	after_access_map = before_access_map | newly_allowed_access;
 
 	*&slot->arch.subpage_wp_info[idx] = after_access_map;
-
 	kvm_spp_setup_structure(vcpu, after_access_map, gfn);
 	spin_unlock(&vcpu->kvm->mmu_lock);
+}
 
-	// find_mapping(vcpu, cr2_or_gpa);
+static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
+{
+	u64 gfn, subpage;
+	gpa_t rip_gpa;
+	u64 rdi,rcx;
+	unsigned int next_insn;
+	u32 newly_allowed_access;
+	gva_t start_addr, end_addr, cur_addr;
+	unsigned int num = 0;
 
-	if(pre_spp_fault_addr) 
-		find_mapping(vcpu, pre_spp_fault_addr);
-	pre_spp_fault_addr = cr2_or_gpa;
+	// subpage
 
-	return;
+	// get instruction
+	rip_gpa = kvm_mmu_gva_to_gpa_system(vcpu, kvm_rip_read(vcpu), NULL);
+	kvm_read_guest(vcpu->kvm, rip_gpa, &next_insn, sizeof(unsigned int));
+
+	if((next_insn & INSN_REPSTOSQ) == INSN_REPSTOSQ){
+		rdi = kvm_rdi_read(vcpu);
+		rcx = kvm_rcx_read(vcpu);
+		start_addr = rdi & SUBPAGE_MASK;
+		end_addr = min(rdi + 8*rcx, (rdi & PAGE_MASK) + PAGE_SIZE);
+		cur_addr = start_addr;
+		newly_allowed_access = 0;
+		while(cur_addr < end_addr){
+			subpage = (cur_addr & 0xfff) >> 7;
+			newly_allowed_access |= 1 << subpage;
+			cur_addr += SUBPAGE_SIZE;
+			num++;
+		}
+		fix_spp_vector(vcpu, kvm_mmu_gva_to_gpa_system(vcpu, start_addr, NULL) >> 12, newly_allowed_access);
+	} else {
+		gfn = cr2_or_gpa >> 12;
+		subpage = (cr2_or_gpa & 0xfff) >> 7;
+		fix_spp_vector(vcpu, gfn, 1 << subpage);
+		num++;
+	}
+	vcpu->kvm->dirty_size += 0x80*num;
+
+	// fullpage
+	// vcpu->kvm->dirty_size += 0x1000;
+	// gfn = cr2_or_gpa >> 12;
+	// fix_spp_vector(vcpu, gfn, FULL_SPP_ACCESS);
+	// num++;
+
+	find_mapping(vcpu, cr2_or_gpa, num);
 }
 
 /*
@@ -3900,9 +3932,6 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, int level,
 			 * the next step.
 			 */
 			if (spte & PT_SPP_MASK) {
-
-				vcpu->kvm->dirty_size += 0x80; // subpage
-				// vcpu->kvm->dirty_size += 0x1000; // fullpage
 				fault_handled = true;
 				fix_subpage_fault(vcpu, cr2_or_gpa);
 				break;

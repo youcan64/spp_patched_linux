@@ -1284,6 +1284,7 @@ struct kvm_vfio_spapr_tce {
 #define KVM_SUBPAGES_SET_ACCESS   _IOW(KVMIO,  0x4a, __u64)
 #define KVM_GET_SPP_LOG   _IOW(KVMIO,  0x4b, struct kvm_spp_log)
 #define KVM_GET_DIRTY_SIZE   _IOW(KVMIO,  0x4c, unsigned long)
+#define KVM_GET_CLOCKS_IN_GUEST _IOW(KVMIO,  0x4d, unsigned long long)
 
 /* enable ucontrol for s390 */
 struct kvm_s390_ucas_mapping {
