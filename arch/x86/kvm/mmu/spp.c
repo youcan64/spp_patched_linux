@@ -322,6 +322,7 @@ int spp_flush_sppt(struct kvm *kvm, u64 gfn_base, u32 npages)
 				continue;
 
 			spde = *iter.sptep;
+			trace_printk("flush_sppt: 0x%llx: 0x%llx\n", gfn, spde);
 			spde &= ~PT_PRESENT_MASK;
 			spp_spte_set(iter.sptep, spde);
 			count = kvm_spp_level_pages(gfn, gfn_end,
@@ -583,9 +584,6 @@ int kvm_spp_mark_protection(struct kvm *kvm, u64 gfn, u32 access)
 	struct kvm_rmap_head *rmap_head;
 	int ret = 0;
 	bool enable;
-	// pr_info("SPP: mark_protection\n");
-	// pr_info("SPP: gfn: %llu\n", gfn);
-	// pr_info("SPP: access_map: %u\n", access);
 
 	if (!kvm->arch.spp_active)
 		return -ENODEV;

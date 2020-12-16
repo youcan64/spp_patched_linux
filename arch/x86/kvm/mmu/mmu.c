@@ -3806,12 +3806,13 @@ static void fix_spp_vector(struct kvm_vcpu *vcpu, gpa_t gfn, u32 newly_allowed_a
 	slot = gfn_to_memslot(vcpu->kvm, gfn);
 	idx = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
 
-	before_access_map = *gfn_to_subpage_wp_info(slot, gfn);
+	before_access_map = slot->arch.subpage_wp_info[idx];
 	after_access_map = before_access_map | newly_allowed_access;
 
-	*&slot->arch.subpage_wp_info[idx] = after_access_map;
+	slot->arch.subpage_wp_info[idx] = after_access_map;
 	kvm_spp_setup_structure(vcpu, after_access_map, gfn);
 	spin_unlock(&vcpu->kvm->mmu_lock);
+	kvm_flush_remote_tlbs(vcpu->kvm);
 }
 
 static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
@@ -3823,6 +3824,8 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 	u32 newly_allowed_access;
 	gva_t start_addr, end_addr, cur_addr;
 	unsigned int num = 0;
+
+	gfn = cr2_or_gpa >> 12;
 
 	// subpage
 
@@ -3843,9 +3846,8 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 			cur_addr += SUBPAGE_SIZE;
 			num++;
 		}
-		fix_spp_vector(vcpu, kvm_mmu_gva_to_gpa_system(vcpu, start_addr, NULL) >> 12, newly_allowed_access);
+		fix_spp_vector(vcpu, gfn, newly_allowed_access);
 	} else {
-		gfn = cr2_or_gpa >> 12;
 		subpage = (cr2_or_gpa & 0xfff) >> 7;
 		fix_spp_vector(vcpu, gfn, 1 << subpage);
 		num++;
