@@ -322,7 +322,6 @@ int spp_flush_sppt(struct kvm *kvm, u64 gfn_base, u32 npages)
 				continue;
 
 			spde = *iter.sptep;
-			trace_printk("flush_sppt: 0x%llx: 0x%llx\n", gfn, spde);
 			spde &= ~PT_PRESENT_MASK;
 			spp_spte_set(iter.sptep, spde);
 			count = kvm_spp_level_pages(gfn, gfn_end,

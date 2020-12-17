@@ -5440,29 +5440,26 @@ static int handle_spp(struct kvm_vcpu *vcpu)
 	 * level 2 to set up the vector if target page is protected.
 	 */
 	spin_lock(&vcpu->kvm->mmu_lock);
-	// gfn &= ~(MAX_ENTRIES_PER_MMUPAGE - 1);
-	// gfn_end = gfn + MAX_ENTRIES_PER_MMUPAGE;
-	// for (; gfn < gfn_end; gfn++) {
-	// 	slot = gfn_to_memslot(vcpu->kvm, gfn);
-	// 	if (!slot)
-	// 		continue;
-	// 	access = gfn_to_subpage_wp_info(slot, gfn);
-	// 	if (access && *access != FULL_SPP_ACCESS) {
-	// 		getnstimeofday(&start_time);
-	// 		kvm_spp_setup_structure(vcpu, *access, gfn);
-	// 		getnstimeofday(&end_time);
-	// 		trace_printk("kvm_spp_setup_structure, %ld, %ld, %ld, %ld, %llu\n", start_time.tv_sec, start_time.tv_nsec, end_time.tv_sec, end_time.tv_nsec, gfn);
-	// 	}
-	// }
-
-	slot = gfn_to_memslot(vcpu->kvm, gfn);
-	if (slot) {
+	gfn &= ~(MAX_ENTRIES_PER_MMUPAGE - 1);
+	gfn_end = gfn + MAX_ENTRIES_PER_MMUPAGE;
+	for (; gfn < gfn_end; gfn++) {
+		slot = gfn_to_memslot(vcpu->kvm, gfn);
+		if (!slot)
+			continue;
 		access = gfn_to_subpage_wp_info(slot, gfn);
 		if (access && *access != FULL_SPP_ACCESS) {
-			// trace_printk("kvm_spp_setup_structure, %llu, %llu\n", gpa, gfn);
 			kvm_spp_setup_structure(vcpu, *access, gfn);
 		}
 	}
+
+	// slot = gfn_to_memslot(vcpu->kvm, gfn);
+	// if (slot) {
+	// 	access = gfn_to_subpage_wp_info(slot, gfn);
+	// 	if (access && *access != FULL_SPP_ACCESS) {
+	// 		// trace_printk("kvm_spp_setup_structure, %llu, %llu\n", gpa, gfn);
+	// 		kvm_spp_setup_structure(vcpu, *access, gfn);
+	// 	}
+	// }
 	spin_unlock(&vcpu->kvm->mmu_lock);
 	return 1;
 out_err:

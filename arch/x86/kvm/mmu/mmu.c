@@ -3829,36 +3829,36 @@ static void fix_subpage_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa)
 
 	// subpage
 
-	// get instruction
-	rip_gpa = kvm_mmu_gva_to_gpa_system(vcpu, kvm_rip_read(vcpu), NULL);
-	kvm_read_guest(vcpu->kvm, rip_gpa, &next_insn, sizeof(unsigned int));
+	// // get instruction
+	// rip_gpa = kvm_mmu_gva_to_gpa_system(vcpu, kvm_rip_read(vcpu), NULL);
+	// kvm_read_guest(vcpu->kvm, rip_gpa, &next_insn, sizeof(unsigned int));
 
-	if((next_insn & INSN_REPSTOSQ) == INSN_REPSTOSQ){
-		rdi = kvm_rdi_read(vcpu);
-		rcx = kvm_rcx_read(vcpu);
-		start_addr = rdi & SUBPAGE_MASK;
-		end_addr = min(rdi + 8*rcx, (rdi & PAGE_MASK) + PAGE_SIZE);
-		cur_addr = start_addr;
-		newly_allowed_access = 0;
-		while(cur_addr < end_addr){
-			subpage = (cur_addr & 0xfff) >> 7;
-			newly_allowed_access |= 1 << subpage;
-			cur_addr += SUBPAGE_SIZE;
-			num++;
-		}
-		fix_spp_vector(vcpu, gfn, newly_allowed_access);
-	} else {
-		subpage = (cr2_or_gpa & 0xfff) >> 7;
-		fix_spp_vector(vcpu, gfn, 1 << subpage);
-		num++;
-	}
-	vcpu->kvm->dirty_size += 0x80*num;
+	// if((next_insn & INSN_REPSTOSQ) == INSN_REPSTOSQ){
+	// 	rdi = kvm_rdi_read(vcpu);
+	// 	rcx = kvm_rcx_read(vcpu);
+	// 	start_addr = rdi & SUBPAGE_MASK;
+	// 	end_addr = min(rdi + 8*rcx, (rdi & PAGE_MASK) + PAGE_SIZE);
+	// 	cur_addr = start_addr;
+	// 	newly_allowed_access = 0;
+	// 	while(cur_addr < end_addr){
+	// 		subpage = (cur_addr & 0xfff) >> 7;
+	// 		newly_allowed_access |= 1 << subpage;
+	// 		cur_addr += SUBPAGE_SIZE;
+	// 		num++;
+	// 	}
+	// 	fix_spp_vector(vcpu, gfn, newly_allowed_access);
+	// } else {
+	// 	subpage = (cr2_or_gpa & 0xfff) >> 7;
+	// 	fix_spp_vector(vcpu, gfn, 1 << subpage);
+	// 	num++;
+	// }
+	// vcpu->kvm->dirty_size += 0x80*num;
 
 	// fullpage
-	// vcpu->kvm->dirty_size += 0x1000;
-	// gfn = cr2_or_gpa >> 12;
-	// fix_spp_vector(vcpu, gfn, FULL_SPP_ACCESS);
-	// num++;
+	vcpu->kvm->dirty_size += 0x1000;
+	gfn = cr2_or_gpa >> 12;
+	fix_spp_vector(vcpu, gfn, FULL_SPP_ACCESS);
+	num++;
 
 	find_mapping(vcpu, cr2_or_gpa, num);
 }
